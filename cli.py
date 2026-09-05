@@ -4,12 +4,28 @@ Command Line Interface for Spatial Transcriptomics Cell Cell Agent.
 import argparse
 import csv
 import json
+import os
 import sys
+from pathlib import Path
 from agents.models import SystemTaskPayload
 from agents.supervisor import SystemSupervisor
 from agents.base import AuditLogger
 
 supervisor = SystemSupervisor(model_provider="mock")
+
+
+def _safe_resolve_path(path_str: str, must_exist: bool = False) -> Path:
+    """Resolve a path safely, preventing path traversal outside the working directory."""
+    path = Path(path_str).resolve()
+    cwd = Path.cwd().resolve()
+    if must_exist and not path.exists():
+        raise FileNotFoundError(f"Input file not found: {path_str}")
+    # Ensure the resolved path is within or equal to the current working directory
+    try:
+        path.relative_to(cwd)
+    except ValueError:
+        raise ValueError(f"Path '{path_str}' resolves outside the working directory (path traversal blocked)")
+    return path
 
 
 def main(argv=None):
@@ -80,22 +96,37 @@ def main(argv=None):
         return 0
 
     if args.command == "batch":
-        with open(args.input, mode="r", encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f)
-            fieldnames = list(reader.fieldnames or [])
-            rows = list(reader)
+        try:
+            in_path = _safe_resolve_path(args.input, must_exist=True)
+            out_path = _safe_resolve_path(args.output, must_exist=False)
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+
+        try:
+            with open(in_path, mode="r", encoding="utf-8-sig") as f:
+                reader = csv.DictReader(f)
+                fieldnames = list(reader.fieldnames or [])
+                rows = list(reader)
+        except (csv.Error, UnicodeDecodeError) as e:
+            print(f"Error reading CSV: {e}", file=sys.stderr)
+            return 1
 
         out_fields = fieldnames + ["overall_urgency", "integrity_status", "total_alerts", "audit_hash"]
         out_rows = []
         for r in rows:
-            payload = SystemTaskPayload(
-                task_id=r.get("task_id", "TASK-01"),
-                target_identifier=r.get("target_identifier", "TARGET-01"),
-                primary_metric=float(r.get("primary_metric", 15.0)),
-                secondary_metric=float(r.get("secondary_metric", 5.0)),
-                status_descriptor=r.get("status_descriptor", "NOMINAL"),
-                is_critical_flag=bool(r.get("is_critical_flag", False)),
-            )
+            try:
+                payload = SystemTaskPayload(
+                    task_id=r.get("task_id", "TASK-01"),
+                    target_identifier=r.get("target_identifier", "TARGET-01"),
+                    primary_metric=float(r.get("primary_metric", 15.0)),
+                    secondary_metric=float(r.get("secondary_metric", 5.0)),
+                    status_descriptor=r.get("status_descriptor", "NOMINAL"),
+                    is_critical_flag=r.get("is_critical_flag", "").lower() in ("true", "1", "yes"),
+                )
+            except (ValueError, TypeError) as e:
+                print(f"Skipping invalid row {r}: {e}", file=sys.stderr)
+                continue
             dossier = supervisor.process_task(payload)
             row_dict = dict(r)
             row_dict["overall_urgency"] = dossier.overall_urgency.value
@@ -104,7 +135,7 @@ def main(argv=None):
             row_dict["audit_hash"] = dossier.audit_hash
             out_rows.append(row_dict)
 
-        with open(args.output, mode="w", encoding="utf-8", newline="") as f:
+        with open(out_path, mode="w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=out_fields)
             writer.writeheader()
             writer.writerows(out_rows)

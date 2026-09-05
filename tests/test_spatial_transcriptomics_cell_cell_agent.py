@@ -3,9 +3,13 @@ Automated Pytest Test Suite for Spatial Transcriptomics Cell Cell Agent.
 Domain: Clinical & Biomedical AI
 Standard: CAP / CLSI / ISO Standards
 """
+import os
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Set a test audit key before importing agents
+os.environ.setdefault("AUDIT_SECRET_KEY", "test-audit-key-for-unit-tests-2026")
 
 import pytest
 from agents.base import PHIGuard, AuditLogger, SecurityException

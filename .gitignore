@@ -8,3 +8,10 @@ output.csv
 dist/
 build/
 *.egg-info/
+.env
+.venv/
+venv/
+*.db
+*.sqlite3
+.DS_Store
+Thumbs.db
