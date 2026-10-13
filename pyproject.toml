@@ -17,11 +17,19 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 requires-python = ">=3.9"
-dependencies = []
+dependencies = ["pydantic>=2,<3"]
+
+[project.optional-dependencies]
+api = ["fastapi>=0.100", "uvicorn>=0.20"]
+test = ["pytest>=8"]
 
 [project.scripts]
 spatial-transcriptomics-cell-cell-engine = "spatial_cell_comm.cli:main"
+spatial-cell-comm = "spatial_cell_comm.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/abusuraihsakhri/spatial-transcriptomics-cell-cell-engine"
-Repository = "https://github.com/abusuraihsakhri/spatial-transcriptomics-cell-cell-engine.git"
+Homepage = "https://github.com/abusuraihsakhri/spatial-transcriptomics-cell-cell-agent"
+Repository = "https://github.com/abusuraihsakhri/spatial-transcriptomics-cell-cell-agent.git"
+
+[tool.setuptools.packages.find]
+include = ["spatial_cell_comm*", "agents*"]
