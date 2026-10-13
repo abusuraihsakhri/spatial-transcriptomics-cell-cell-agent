@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from .models import FrontierPayload
 from .agents import SpatialCellCommCoordinator
+from .proximity import analyze_proximity
 
 coordinator = SpatialCellCommCoordinator()
 
@@ -47,12 +48,37 @@ def main(argv=None):
     p_batch.add_argument("-i", "--input", required=True)
     p_batch.add_argument("-o", "--output", default="results.csv")
 
+    # Descriptive spatial proximity
+    p_proximity = subparsers.add_parser("proximity", help="Count nearby cell-type pairs from spatial CSV")
+    p_proximity.add_argument("-i", "--input", required=True, help="CSV with cell_id,cell_type,x,y")
+    p_proximity.add_argument("--radius", type=float, required=True, help="Distance cutoff in coordinate units")
+    p_proximity.add_argument("-o", "--output", help="Optional JSON report path")
+
     # Serve
     p_serve = subparsers.add_parser("serve", help="Launch FastAPI REST server")
     p_serve.add_argument("--host", default="127.0.0.1")
     p_serve.add_argument("--port", type=int, default=8000)
 
     args = parser.parse_args(argv)
+
+    if args.command == "proximity":
+        try:
+            in_path = _safe_resolve_path(args.input, must_exist=True)
+            out_path = _safe_resolve_path(args.output) if args.output else None
+            if out_path is not None and out_path == in_path:
+                raise ValueError("Output file must differ from input CSV")
+            with in_path.open("r", encoding="utf-8-sig", newline="") as file:
+                result = analyze_proximity(csv.DictReader(file), args.radius)
+            report = json.dumps(result, indent=2, ensure_ascii=False)
+            if out_path:
+                out_path.write_text(report + "\n", encoding="utf-8")
+                print(f"Spatial proximity report written to {args.output}")
+            else:
+                print(report)
+            return 0
+        except (ValueError, OSError, csv.Error) as exc:
+            print(f"Proximity analysis failed: {exc}", file=sys.stderr)
+            return 1
 
     if args.command == "audit":
         payload = FrontierPayload(
@@ -137,6 +163,9 @@ def main(argv=None):
             if app:
                 print(f"Starting SpatialCellComm: Ligand-Receptor Interaction & Spatial Proximity Agent on http://{args.host}:{args.port}")
                 uvicorn.run(app, host=args.host, port=args.port)
+            else:
+                print("FastAPI is not installed. Run 'pip install fastapi uvicorn'", file=sys.stderr)
+                return 1
         except ImportError:
             print("FastAPI / uvicorn not installed. Run 'pip install fastapi uvicorn'")
             return 1
