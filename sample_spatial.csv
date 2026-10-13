@@ -1,0 +1,6 @@
+cell_id,cell_type,x,y
+C001,T cell,0,0
+C002,Macrophage,3,4
+C003,T cell,6,8
+C004,Fibroblast,100,100
+C005,Macrophage,103,104

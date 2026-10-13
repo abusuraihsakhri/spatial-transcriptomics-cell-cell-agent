@@ -1,233 +1,79 @@
-# Spatial Transcriptomics Cell Cell Agent
+# Spatial Transcriptomics Cell–Cell Agent
 
-> **Domain:** Clinical Decision Support & Biomedical Computing
-> **Reference Guidelines & Standards:** `Standard Clinical Formulations & ISO/IEC Quality Frameworks`
+A **descriptive cell-type spatial proximity** tool for 2D cell/spot coordinates. The standalone browser app runs locally without transmitting input records. A Python CLI implements the same proximity definition. Legacy generic audit interfaces remain available separately.
 
-<div align="center">
+## Spatial analysis
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
+Input: CSV with exactly these required columns (additional columns are allowed):
 
-</div>
+| Column | Meaning |
+| --- | --- |
+| cell_id | Unique cell or spot identifier |
+| cell_type | Categorical cell/spot type |
+| x, y | Finite coordinates in one consistent unit (for example, µm) |
 
----
+Every pair of **distinct** cells/spots at Euclidean distance **≤ radius** contributes one unordered pair of cell types (A–B equals B–A). Same-type pairs are included. The table reports each observed pair count and mean distance; the summary reports cells, cell types and all nearby pairs.
 
-## 📖 What It Does
+### Browser workflow
 
-**Spatial Transcriptomics Cell Cell Agent** is an advanced analytical and computational platform implementing 10x Visium Delaunay mesh & CellChat ligand-receptor communication hub agent.
+Open the published Pages app, or open [web/index.html](web/index.html) locally in a modern browser. Load a CSV file or paste records, select a radius, analyze, inspect the scatterplot and pair table, and download a CSV summary. The example is loaded automatically.
 
-The system provides a multi-worker evaluation engine that processes task payloads through specialized workers (InvariantQC, SafetyEscalation, ProtocolConformance) to produce consensus dossiers with cryptographic audit trails.
+Files are processed **entirely in the browser** using JavaScript; there are no API calls. Selected files are limited to 2 MB and analysis to 3,000 cells/spots. Avoid using identifiable patient data.
 
----
+### Python workflow
 
-## ⚙️ Key Capabilities & Algorithmic Modules
+Install Python 3.9+ and run:
 
-- **Deterministic Calculation Engine**: Strict compliance with standard reference formulations and thresholds.
-- **Risk & Urgency Classification**: Multi-tier categorization with automated clinical/operational action recommendations.
-- **Validation & Guardrails**: Rigorous input bounds checking and anomaly detection.
-- **Multi-Worker Architecture**: Specialized workers for QC, safety, and protocol conformance evaluation.
-- **HMAC-SHA256 Audit Trail**: Cryptographically tamper-evident logging with chain verification.
-- **PHI Outbound Guard**: Regex-based detection and blocking of protected health information.
+    python -m pip install -e .
+    spatial-cell-comm proximity -i sample_spatial.csv --radius 5 -o proximity.json
 
----
+Or from the checkout without installing an entry point:
 
-## 🚀 Installation
+    python -m spatial_cell_comm.cli proximity -i sample_spatial.csv --radius 5
 
-```bash
-# Clone the repository
-git clone https://github.com/abusuraihsakhri/spatial-transcriptomics-cell-cell-agent.git
-cd spatial-transcriptomics-cell-cell-agent
+The Python proximity implementation handles up to 5,000 rows by default, rejects empty/duplicate IDs, invalid coordinates and invalid radius, and writes JSON to stdout or the requested output file. CLI input and output paths must resolve under the working directory.
 
-# Install dependencies
-pip install fastapi uvicorn pydantic pytest
-```
+**Scientific limits:** The proximity counts are descriptive, not inferential. They are **not** measurements of ligand–receptor activity, CellChat signaling, directional communication, or statistical enrichment. Delaunay triangulation and gene-expression analysis are not implemented. Upstream cell-type annotation, physical coordinate calibration and appropriate biological controls remain necessary. Do not treat observed colocalization as evidence of direct signaling.
 
----
+## Legacy audit CLI and API
 
-## 💻 CLI Usage
+The existing numerical audit programs are retained for compatibility but remain **generic example threshold evaluators**, not validated spatial-omics analyses or clinical decision support. They check supplied metrics and status text against built-in arbitrary rules.
 
-### 1. Run Single Audit Evaluation
-```bash
-python cli.py audit --task-id TASK-001 --target TARGET-01 --primary 28.5 --secondary 14.2 --critical --status DISCORDANT
-```
+    python -m pip install -e ".[api]"
+    export AUDIT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+    python cli.py audit --task-id TASK-001 --target TARGET-01 --primary 28.5 --secondary 14.2
+    python cli.py batch -i sample.csv -o results.csv
+    python cli.py chat "What is the status?"
+    python cli.py verify-audit
+    python cli.py serve --host 127.0.0.1 --port 8000
 
-### 2. Query Supervisory Chat
-```bash
-python cli.py chat "What is the system status?"
-```
+The API provides GET /health, GET /metrics, POST /api/audit and POST /api/chat. GET /api/audit/logs is disabled by default; setting a separate AUDIT_LOG_READ_TOKEN enables read-only access with Authorization: Bearer TOKEN. Do not reuse the HMAC signing key for that token.
 
-### 3. Batch Process CSV Records
-```bash
-python cli.py batch -i sample.csv -o results.csv
-```
+AUDIT_SECRET_KEY must be configured for audit operations. Use a random key of at least 32 bytes (minimum implementation length: 16 characters). Audit chains are **process-memory only**, not persistent audit storage. The regex-based PHI guard cannot guarantee de-identification or HIPAA compliance. The LLM adapter is a deterministic mock; remote and local model provider integrations are not implemented.
 
-### 4. Verify Audit Trail Integrity
-```bash
-python cli.py verify-audit
-```
+Docker Compose binds the Python API to 127.0.0.1:8000 by default and requires AUDIT_SECRET_KEY. Do not expose the unauthenticated task submission endpoints to untrusted networks.
 
-### 5. Launch FastAPI REST Server
-```bash
-python cli.py serve --host 127.0.0.1 --port 8000
-```
+## Development and verification
 
-### Parameter Reference
-| Parameter | Description | Default |
-|:----------|:------------|:--------|
-| `--task-id` | Unique task/case identifier | `TASK-2026-001` |
-| `--target` | Entity or target identifier | `KEY-TARGET-01` |
-| `--primary` | Primary measurement (float) | `28.5` |
-| `--secondary` | Secondary measurement (float) | `14.2` |
-| `--critical` | Emergency escalation flag | `False` |
-| `--status` | Status/phenotype descriptor | `DISCORDANT` |
+    python -m pip install -e ".[api,test]"
+    export AUDIT_SECRET_KEY=unit-test-placeholder-key
+    pytest -q
+    node --check web/app.js
+    node --test tests/test_proximity_web.cjs
 
----
+Node.js is used only for browser-unit testing, not by the production browser app. CI runs the Python tests and browser JavaScript tests. The Pages workflow publishes web/ when GitHub Pages is configured to deploy from GitHub Actions.
 
-## 🌐 REST API Endpoints
+The frontend uses standard JavaScript, File APIs and Canvas and is intended for recent Chrome, Firefox, Edge and Safari; exhaustive cross-browser coverage has not been performed.
 
-When running the server (`python cli.py serve`), the following endpoints are available:
+## Repository contents
 
-| Method | Endpoint | Description |
-|:-------|:---------|:------------|
-| `GET` | `/health` | Health and metadata check |
-| `GET` | `/metrics` | Operational metrics (dossier count, audit blocks) |
-| `POST` | `/api/audit` | Dispatch task payload across workers |
-| `POST` | `/api/chat` | Supervisory conversational assistant |
-| `GET` | `/api/audit/logs` | Retrieve and verify HMAC audit trail |
+- [web/](web/): standalone browser spatial-proximity app
+- [spatial_cell_comm/proximity.py](spatial_cell_comm/proximity.py): Python proximity algorithm
+- [spatial_cell_comm/cli.py](spatial_cell_comm/cli.py): spatial CLI and retained generic audit tools
+- [agents/](agents/), [cli.py](cli.py): legacy generic audit backend, REST API, and CLI
+- [tests/](tests/): Python and Node.js regression tests
+- [.github/workflows/](.github/workflows/): CI and Pages deployment
 
-### Example API Request
-```bash
-curl -X POST http://localhost:8000/api/audit \
-  -H "Content-Type: application/json" \
-  -d '{
-    "task_id": "TASK-001",
-    "target_identifier": "TARGET-01",
-    "primary_metric": 28.5,
-    "secondary_metric": 14.2,
-    "status_descriptor": "DISCORDANT",
-    "is_critical_flag": true
-  }'
-```
+## License
 
----
-
-## 🔐 Security Configuration
-
-### Required Environment Variable
-
-**`AUDIT_SECRET_KEY`** must be set before running the application. This key is used for HMAC-SHA256 audit trail signing.
-
-```bash
-# Linux/macOS
-export AUDIT_SECRET_KEY="your-cryptographically-random-key-min-16-chars"
-
-# Windows (PowerShell)
-$env:AUDIT_SECRET_KEY="your-cryptographically-random-key-min-16-chars"
-
-# Windows (CMD)
-set AUDIT_SECRET_KEY=your-cryptographically-random-key-min-16-chars
-```
-
-> ⚠️ **Security Warning**: Never use hardcoded secrets in production. Generate a cryptographically random key of at least 32 characters.
-
-### Docker Deployment
-
-Create a `.env` file:
-```env
-AUDIT_SECRET_KEY=your-production-audit-key-here
-MODEL_PROVIDER=mock
-```
-
-Then run:
-```bash
-docker-compose up --build
-```
-
----
-
-## 🧪 Testing & Verification
-
-### Run the automated test suite:
-```bash
-# Set test key
-export AUDIT_SECRET_KEY="test-audit-key-for-unit-tests-2026"
-
-# Run tests
-pytest -v
-```
-
-### Run simulation benchmark:
-```bash
-python simulator.py 1000
-```
-
----
-
-## 🛡️ Security Features
-
-* **Zero-PHI Outbound Interceptor:** Active regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs with full signature verification.
-* **Input Validation:** Finite number checks (NaN/Infinity rejection), path traversal prevention, and identifier sanitization.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
-
----
-
-## 📁 Project Structure
-
-```
-spatial-transcriptomics-cell-cell-agent/
-├── agents/                    # Core agent modules
-│   ├── __init__.py           # Package init
-│   ├── api.py                # FastAPI REST server
-│   ├── base.py               # Security, PHI guard, audit trail
-│   ├── learning.py           # Bayesian calibration engine
-│   ├── llm_factory.py        # LLM provider factory
-│   ├── metrics.py            # Prometheus metrics collector
-│   ├── models.py             # Pydantic data schemas
-│   ├── streamer.py           # WebSocket telemetry broadcaster
-│   ├── supervisor.py         # Supervisor orchestrator
-│   └── workers.py            # Specialized worker agents
-├── spatial_cell_comm/         # SpatialCellComm sub-package
-│   ├── __init__.py
-│   ├── agents.py             # Spatial agent implementations
-│   ├── cli.py                # Spatial CLI
-│   ├── engine.py             # Core algorithmic engine
-│   ├── models.py             # Data models
-│   └── server.py             # Spatial FastAPI server
-├── tests/                     # Test suite
-│   ├── test_enrichment.py
-│   ├── test_spatial_cell_comm.py
-│   └── test_spatial_transcriptomics_cell_cell_agent.py
-├── web/                       # Web dashboard
-│   └── index.html
-├── .github/workflows/         # CI/CD
-│   └── ci.yml
-├── cli.py                     # Main CLI entry point
-├── simulator.py               # Simulation benchmark
-├── enrichment.py              # Enrichment features
-├── pyproject.toml             # Project metadata
-├── Dockerfile                 # Docker build
-├── docker-compose.yml         # Docker Compose config
-└── README.md                  # This file
-```
-
----
-
-## 🐳 Container Deployment
-
-```bash
-docker build -t spatial-transcriptomics-cell-cell-agent .
-docker run -p 8000:8000 -e AUDIT_SECRET_KEY=your-secret-key spatial-transcriptomics-cell-cell-agent
-```
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).
