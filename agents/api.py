@@ -1,7 +1,7 @@
 """
 FastAPI REST API Server for Spatial Transcriptomics Cell Cell Agent.
 """
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import hmac
 import os
 from fastapi import FastAPI, HTTPException, Header, Request
@@ -65,7 +65,7 @@ def api_chat(req: ChatRequest):
 
 
 @app.get("/api/audit/logs")
-def api_audit_logs(authorization: str | None = Header(default=None)):
+def api_audit_logs(authorization: Optional[str] = Header(default=None)):
     """Read-only audit export requires a dedicated bearer token.
 
     AUDIT_LOG_READ_TOKEN is distinct from the HMAC signing key.
